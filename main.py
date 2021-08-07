@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+from pygame import mixer
 
 # Initialize pygame
 pygame.init()
@@ -9,10 +10,14 @@ pygame.init()
 screen = pygame.display.set_mode((800,600)) # Window size, x and y from left top corner
 
 # Background
-background = pygame.image.load("Art\\background_0.jpg")
+background = pygame.image.load('Art\\background_0.jpg')
+
+# Background Music
+mixer.music.load('Sounds\\background.mp3')
+mixer.music.play(-1) # -1 is to play song in an endless loop
 
 # Title and Icon
-pygame.display.set_caption("Invasores del Mas Alla")
+pygame.display.set_caption('Invaders from Beyond')
 icon = pygame.image.load('Art\\icon.png')
 pygame.display.set_icon(icon)
 
@@ -23,11 +28,19 @@ player_y = 480
 player_x_change = 0
 
 # Enemy
-enemy_image = pygame.image.load('Art\\enemy.png')
-enemy_x = random.randint(0,735)
-enemy_y = random.randint(50,150)
-enemy_x_change = 0.3
-enemy_y_change = 40
+enemy_image = []
+enemy_x = []
+enemy_y = []
+enemy_x_change = []
+enemy_y_change = []
+num_of_enemies = 6
+
+for i in range(num_of_enemies):
+    enemy_image.append(pygame.image.load('Art\\enemy.png'))
+    enemy_x.append(random.randint(0,735))
+    enemy_y.append(random.randint(50,150))
+    enemy_x_change.append(0.3)
+    enemy_y_change.append(40)
 
 # Bullet
 bullet_image = pygame.image.load('Art\\bullet.png')
@@ -36,13 +49,28 @@ bullet_y = 480
 bullet_y_change = 0.75
 bullet_state = "ready" # Ready - you cant see the bullet
 
-score = 0
+# Score Text
+score_value = 0
+font = pygame.font.Font("freesansbold.ttf", 30)
+text_x = 10 # x coordinate
+text_y = 10 # y coordinate
+
+# Game Over Text
+game_over_font = pygame.font.Font("freesansbold.ttf", 70)
+
+def show_score(x, y):
+    score = font.render("Score: " + str(score_value), True, (255,255,255))
+    screen.blit(score, (x, y))
+
+def show_game_over():
+    game_over_text = game_over_font.render("GAME OVER", True, (255, 255, 255))
+    screen.blit(game_over_text,(200, 250))
 
 def player(x, y):
     screen.blit(player_image,(x, y)) # Draw the player imagine on our window
 
-def enemy(x, y):
-    screen.blit(enemy_image,(x, y))
+def enemy(x, y, i):
+    screen.blit(enemy_image[i],(x, y))
 
 def fire_bullet(x,y):
     global bullet_state
@@ -55,6 +83,8 @@ def is_collision(enemy_x, enemy_y, bullet_x, bullet_y):
         return True
     else:
         return False
+
+
 
 # Game main loop
 running = True
@@ -75,6 +105,8 @@ while running:
                 player_x_change = 0.3
             if event.key == pygame.K_SPACE:
                 if bullet_state is "ready":
+                    bullet_sound = mixer.Sound('Sounds\\laser.wav')
+                    bullet_sound.play()
                     # Get the current x coordinate of the spaceship
                     bullet_x = player_x
                     fire_bullet(bullet_x, bullet_y)
@@ -92,14 +124,37 @@ while running:
         player_x = 740
 
     # Enemy movement
-    enemy_x += enemy_x_change
-    # Movement Boundaries
-    if enemy_x <= -4:
-        enemy_x_change = 0.2
-        enemy_y += enemy_y_change
-    elif enemy_x >= 740: # 800 - x (x is aprox. the size of the ship)
-        enemy_x_change = -0.2
-        enemy_y += enemy_y_change
+    for i in range(num_of_enemies):
+
+        # Game Over
+        if enemy_y[i] > 440:
+            for j in range(num_of_enemies):
+                enemy_y[j] = 2000 # make enemy dissapear from the screen by moving them to 2000 coordinate
+            show_game_over()
+            break
+
+        enemy_x[i] += enemy_x_change[i]
+        # Movement Boundaries
+        if enemy_x[i] <= -4:
+            enemy_x_change[i] = 0.2
+            enemy_y[i] += enemy_y_change[i]
+        elif enemy_x[i] >= 740: # 800 - x (x is aprox. the size of the ship)
+            enemy_x_change[i] = -0.2
+            enemy_y[i] += enemy_y_change[i]
+
+        # Collision
+        collision = is_collision(enemy_x[i], enemy_y[i], bullet_x, bullet_y)
+        if collision:
+            explosion_sound = mixer.Sound('Sounds\\hit.wav')
+            explosion_sound.play()
+            bullet_y = 480
+            bullet_state = "ready"
+            score_value += 1
+            enemy_x[i] = random.randint(0,735)
+            enemy_y[i] = random.randint(50,150)
+
+        enemy(enemy_x[i], enemy_y[i], i)
+
 
     # Bullet Movement
     if bullet_y <= 0:
@@ -110,17 +165,7 @@ while running:
         fire_bullet(bullet_x, bullet_y)
         bullet_y -= bullet_y_change
 
-    # Collision
-    collision = is_collision(enemy_x, enemy_y, bullet_x, bullet_y)
-    if collision:
-        bullet_y = 480
-        bullet_state = "ready"
-        score += 1
-        print(score)
-        enemy_x = random.randint(0,735)
-        enemy_y = random.randint(50,150)
-
 
     player(player_x, player_y) # loads player into window
-    enemy(enemy_x, enemy_y)
+    show_score(text_x, text_y)
     pygame.display.update()
